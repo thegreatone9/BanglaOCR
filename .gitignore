@@ -1,0 +1,35 @@
+# Dataset (too large for git)
+data/
+
+# Trained models (too large for git)
+models/
+
+# MLflow experiment tracking
+artifacts/
+mlruns/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
