@@ -1,0 +1,15 @@
+artifact_uri: /Users/musakhan/Documents/Practice/BanglaOCR/artifacts/mlflow/990941922252886375/29195feb4ce84219bc4d957af39a4853/artifacts
+deleted_time: null
+end_time: null
+entry_point_name: ''
+experiment_id: '990941922252886375'
+lifecycle_stage: active
+run_id: 29195feb4ce84219bc4d957af39a4853
+run_name: cnn-training
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1780156198171
+status: 1
+tags: []
+user_id: musakhan
