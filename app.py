@@ -36,8 +36,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-
-
 # Model & Labels Loading (Cached)
 @st.cache_resource
 def load_model():
@@ -61,7 +59,6 @@ def load_labels():
 
 
 # Segmentation — Matra-Aware 3-Phase Approach
-
 def detect_and_remove_matra(binary_img):
     """
     Detect the Matra (horizontal headline) via horizontal projection profile
@@ -71,7 +68,7 @@ def detect_and_remove_matra(binary_img):
     """
     h, w = binary_img.shape
 
-    # Horizontal projection: sum foreground pixels per row
+    # Horizontal projection: sum pixels per row
     h_proj = np.sum(binary_img, axis=1) / 255.0
 
     # Matra should be in the upper ~40% of the image
@@ -86,16 +83,19 @@ def detect_and_remove_matra(binary_img):
     threshold = peak * 0.6
     matra_rows = np.where(upper_region > threshold)[0]
 
-    if len(matra_rows) < 2:  # Need at least a few rows to be a Matra
+    # Threshold to be a Matra
+    if len(matra_rows) < 2:
         return binary_img, False, None
 
-    # Check if the detected rows span a reasonable width (should be a line, not a block)
     matra_height = matra_rows[-1] - matra_rows[0] + 1
-    if matra_height > h * 0.2:  # Matra shouldn't be more than 20% of image height
+
+    # Matra shouldn't be more than 20% of image height
+    if matra_height > h * 0.2:  
         return binary_img, False, None
 
     # Remove the Matra by zeroing those rows
     result = binary_img.copy()
+
     # Add a small margin around the matra rows
     start_row = max(0, matra_rows[0] - 1)
     end_row = min(h, matra_rows[-1] + 2)
@@ -116,7 +116,7 @@ def segment_by_vertical_projection(binary_img, min_char_width=10):
     if np.max(v_proj) == 0:
         return []
 
-    # Find valleys (columns with very few foreground pixels)
+    # Eliminate noise with thresholding: consider columns with very low pixel counts as gaps
     threshold = np.max(v_proj) * 0.05
     is_gap = v_proj <= threshold
 
@@ -146,6 +146,7 @@ def merge_close_boxes(boxes, x_threshold=15):
         return []
 
     merged = [list(boxes[0])]
+    
     for box in boxes[1:]:
         prev = merged[-1]
         prev_right = prev[0] + prev[2]
@@ -172,6 +173,7 @@ def segment_by_contours(binary_img, min_area=100):
     contours, _ = cv2.findContours(binary_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     boxes = []
+
     for contour in contours:
         x, y, w, h = cv2.boundingRect(contour)
         if w * h > min_area:
@@ -271,8 +273,6 @@ def segment_word(canvas_image):
     return char_images, binary
 
 
-# Prediction
-
 def predict_characters(model, char_images, labels):
     """Predict each character and return results."""
     # Determine if model expects 1 or 3 channels
@@ -304,17 +304,12 @@ def predict_characters(model, char_images, labels):
     return results
 
 
-
-
-# Main Content
-
+# UI Content
 st.title("🔤 Bangla OCR")
 
-# Load model and labels
 model = load_model()
 labels = load_labels()
 
-# Validate model & labels availability
 model_ok = True
 if model is None:
     st.error(
@@ -330,6 +325,7 @@ if labels is None:
     )
     model_ok = False
 
+#Two-column layout
 left_col, right_col = st.columns([3, 3], gap="large")
 
 with left_col:
@@ -347,11 +343,10 @@ with left_col:
         key="canvas",
     )
 
-    # Left-aligned compact Predict button
+    # Predict button
     btn_col, _ = st.columns([1, 2])
     with btn_col:
         predict_clicked = st.button("🔍 Predict", type="primary", use_container_width=True)
-
 
 
 with right_col:
@@ -383,7 +378,6 @@ with right_col:
                 if not char_images:
                     st.warning("⚠️ No characters could be segmented from the drawing. Try drawing more clearly.")
                 else:
-                    # Run prediction
                     results = predict_characters(model, char_images, labels)
 
                     # Build the combined word
@@ -399,11 +393,14 @@ with right_col:
                     # Create columns for character cards
                     num_chars = len(results)
                     cols_per_row = min(num_chars, 4)
+
                     for row_start in range(0, num_chars, cols_per_row):
                         row_end = min(row_start + cols_per_row, num_chars)
                         char_cols = st.columns(row_end - row_start)
+
                         for idx, col in enumerate(char_cols):
                             r = results[row_start + idx]
+
                             with col:
                                 # Show the segmented character image
                                 display_img = (r["image"] * 255).astype(np.uint8)
@@ -425,10 +422,10 @@ with right_col:
                     with left_col:
                         st.subheader("🧩 Segmented Characters")
                         seg_cols = st.columns(min(len(results), 8))
+
                         for i, r in enumerate(results):
                             with seg_cols[i % len(seg_cols)]:
                                 display_img = (r["image"] * 255).astype(np.uint8)
                                 st.image(display_img, width=64, caption=r["top_prediction"][0])
     else:
-        # Placeholder when no prediction has been made yet
         st.write("✨ Draw on the canvas and click **Predict** to see results here.")

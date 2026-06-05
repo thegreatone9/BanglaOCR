@@ -176,25 +176,25 @@ Then open http://localhost:5000 in your browser to compare runs.
 
 ## Word Segmentation Strategy
 
-The system uses a **Matra-aware 3-phase** segmentation approach to handle connected Bangla characters:
+The system uses a **Matra-aware 3-phase** segmentation approach to handle connected Bangla characters. Because Bangla words are typically joined by a continuous top line (the *Matra*), simple character cropping fails on full words. Here is how our system breaks down a drawn word into individual characters for the AI to identify:
 
 ### Phase 1 — Matra Detection & Removal
-
-The Matra (মাত্রা) is the horizontal headline that connects Bangla characters. We detect it using the **horizontal projection profile** (sum of foreground pixels per row). The Matra appears as a high-density peak in the upper portion of the image. By removing it, characters that were only connected through the headline become separated.
+The Matra connects multiple letters into a single visual "island" of ink. 
+To separate the letters, the `detect_and_remove_matra()` function searches for the Matra by calculating the **horizontal projection profile** (summing the ink pixels row by row). The Matra appears as a massive spike in pixel density near the top. Once found, this horizontal line is temporarily erased from a working copy of the image, breaking the physical connection between the letters beneath it.
 
 ### Phase 2 — Vertical Projection Segmentation
+With the top connecting line erased, the letters are now free-standing. 
+The `segment_by_vertical_projection()` function calculates the **vertical projection profile** (summing ink column by column). Natural spaces between characters appear as completely empty columns (gaps). The algorithm slices the image vertically at these empty gaps, effectively separating the word into individual character blocks.
 
-After Matra removal, we compute the **vertical projection profile** (sum of foreground pixels per column). Natural gaps between characters appear as valleys (columns with zero or near-zero foreground pixels). We cut the image at these valley points.
+### Phase 3 — Connected Component Analysis (CCA) Fallback
+Not all Bangla characters have a Matra (e.g., 'ও', 'এ'). If Phase 1 detects no Matra, vertical slicing might be unreliable.
+In this case, the system falls back to `segment_by_contours()`. It uses Connected Component Analysis (finding isolated "islands" of ink) to draw tight bounding boxes around every shape. It filters out tiny specks of noise and uses `merge_close_boxes()` to reconnect characters that are made of multiple disconnected strokes (like dots or curls).
 
-### Phase 3 — CCA Fallback
+### Post-Processing & Identification
+No matter which phase was used to cut the character, the resulting cropped image is sent to `preprocess_char()`. 
+This function acts as the final cleaner: it centers the character, pads it into a perfect square, and resizes it to a clean 64×64 pixel image. 
 
-If no Matra is detected (e.g., characters were drawn without the headline), we fall back to **connected component analysis** using OpenCV's `findContours`. Bounding boxes are computed, filtered by minimum area, and merged when close together (to handle multi-stroke characters).
-
-### Post-Processing
-
-- Tiny fragments (diacritics, noise) are merged into the nearest character
-- Segments are sorted left-to-right by x-coordinate
-- Each segment is cropped, padded to a square, and resized to 64×64 for prediction
+Finally, these prepared 64×64 images are sent to the trained **CNN / MobileNetV2** model. The model calculates the probability of each image belonging to one of the 84 trained Bangla character classes, and the highest probability is returned as the final predicted letter!
 
 ---
 
