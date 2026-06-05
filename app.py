@@ -304,53 +304,11 @@ def predict_characters(model, char_images, labels):
     return results
 
 
-# Sidebar
-with st.sidebar:
-    st.markdown("## 🔤 Bangla OCR")
-    st.markdown("---")
-
-    st.markdown("### 📖 About")
-    st.markdown(
-        "This app recognizes **handwritten Bangla characters** from your drawings. "
-        "It uses a deep learning model trained on the Ekush dataset and a "
-        "**matra-aware segmentation** pipeline to split words into individual characters."
-    )
-
-    st.markdown("---")
-
-    st.markdown("### ✍️ How to Use")
-    st.markdown("""
-1. **Draw** a Bangla word or character on the canvas
-2. Click **🔍 Predict** to recognize characters
-3. View the predicted word and individual character details
-4. Use the **🗑️ trash icon** on the canvas toolbar to clear
-    """)
-
-    st.markdown("---")
-
-    st.markdown("### 🧠 Segmentation Pipeline")
-    st.markdown("""
-- **Phase 1:** Matra (headline) detection & removal via horizontal projection
-- **Phase 2:** Vertical projection to find gaps between characters
-- **Phase 3:** Connected component analysis (CCA) fallback
-    """)
-
-    st.markdown("---")
-
-    st.markdown("### ⚙️ Technical Details")
-    st.markdown("""
-- **Input Size:** 64×64 grayscale
-- **Framework:** TensorFlow / Keras
-- **Canvas:** streamlit-drawable-canvas
-    """)
-
-    st.caption("Built with ❤️ using Streamlit")
 
 
 # Main Content
 
 st.title("🔤 Bangla OCR")
-st.caption("Draw a Bangla word or character below and click Predict")
 
 # Load model and labels
 model = load_model()
@@ -372,7 +330,7 @@ if labels is None:
     )
     model_ok = False
 
-left_col, right_col = st.columns([3, 2], gap="large")
+left_col, right_col = st.columns([3, 3], gap="large")
 
 with left_col:
     st.subheader("✍️ Drawing Canvas")
@@ -383,14 +341,18 @@ with left_col:
         stroke_width=8,
         stroke_color="#000000",
         background_color="#FFFFFF",
-        width=500,
-        height=200,
+        width=620,
+        height=220,
         drawing_mode="freedraw",
         key="canvas",
     )
 
-    # Predict button
-    predict_clicked = st.button("🔍 Predict", type="primary", use_container_width=True)
+    # Left-aligned compact Predict button
+    btn_col, _ = st.columns([1, 2])
+    with btn_col:
+        predict_clicked = st.button("🔍 Predict", type="primary", use_container_width=True)
+
+
 
 with right_col:
     st.subheader("📊 Prediction Results")
