@@ -7,6 +7,8 @@
 #    ./run.sh docker stop    — Stop and remove the container
 #    ./run.sh local start    — Run app in local .venv
 #    ./run.sh local stop     — Kill the local Streamlit process
+#    ./run.sh mlflow start   — Launch MLflow UI (experiments viewer)
+#    ./run.sh mlflow stop    — Kill the MLflow UI process
 #
 # ─────────────────────────────────────────────────────────────
 
@@ -19,6 +21,9 @@ PORT=8501
 VENV_DIR="$(dirname "$0")/.venv"
 APP_FILE="$(dirname "$0")/app.py"
 PID_FILE="/tmp/bangla-ocr-local.pid"
+MLFLOW_DB="$(dirname "$0")/artifacts/mlflow.db"
+MLFLOW_PORT=5000
+MLFLOW_PID_FILE="/tmp/bangla-ocr-mlflow.pid"
 
 # ── Helpers ──────────────────────────────────────────────────
 info()    { echo -e "\033[1;34m[INFO]\033[0m  $*"; }
@@ -33,16 +38,19 @@ usage() {
     echo "  Modes:"
     echo "    docker   — Run inside Docker container (model baked in)"
     echo "    local    — Run directly with local .venv"
+    echo "    mlflow   — Launch MLflow experiment tracking UI"
     echo ""
     echo "  Actions:"
-    echo "    start    — Start the app"
-    echo "    stop     — Stop the app"
+    echo "    start    — Start the service"
+    echo "    stop     — Stop the service"
     echo ""
     echo "  Examples:"
     echo "    ./run.sh docker start"
     echo "    ./run.sh docker stop"
     echo "    ./run.sh local start"
     echo "    ./run.sh local stop"
+    echo "    ./run.sh mlflow start"
+    echo "    ./run.sh mlflow stop"
     echo ""
     exit 1
 }
@@ -155,6 +163,63 @@ local_stop() {
     fi
 }
 
+# ── MLflow mode ──────────────────────────────────────────────
+mlflow_start() {
+    if [ ! -f "$MLFLOW_DB" ]; then
+        error "MLflow DB not found at '$MLFLOW_DB'.\nRun training first: python train.py"
+    fi
+
+    if [ ! -f "$VENV_DIR/bin/mlflow" ]; then
+        error "mlflow not found in venv. Run: .venv/bin/pip install mlflow"
+    fi
+
+    if [ -f "$MLFLOW_PID_FILE" ] && kill -0 "$(cat "$MLFLOW_PID_FILE")" 2>/dev/null; then
+        warn "MLflow UI already running (PID $(cat "$MLFLOW_PID_FILE"))."
+        info "  Stop it first with: ./run.sh mlflow stop"
+        exit 1
+    fi
+
+    info "Starting MLflow UI on port $MLFLOW_PORT..."
+    nohup "$VENV_DIR/bin/mlflow" ui \
+        --backend-store-uri "sqlite:///${MLFLOW_DB}" \
+        --port "$MLFLOW_PORT" \
+        > /tmp/bangla-ocr-mlflow.log 2>&1 &
+
+    echo $! > "$MLFLOW_PID_FILE"
+    info "Waiting for MLflow UI to be ready..."
+
+    # Any HTTP response (even 4xx) means the server is up and accepting connections
+    for i in {1..30}; do
+        if curl -s -o /dev/null "http://localhost:${MLFLOW_PORT}" >/dev/null 2>&1; then
+            success "MLflow UI running → http://localhost:${MLFLOW_PORT}  (PID $(cat "$MLFLOW_PID_FILE"))"
+            info "  Logs: tail -f /tmp/bangla-ocr-mlflow.log"
+            return 0
+        fi
+        sleep 1
+    done
+    warn "Health check timed out — check logs: tail -f /tmp/bangla-ocr-mlflow.log"
+}
+
+mlflow_stop() {
+    if [ -f "$MLFLOW_PID_FILE" ] && kill -0 "$(cat "$MLFLOW_PID_FILE")" 2>/dev/null; then
+        PID=$(cat "$MLFLOW_PID_FILE")
+        info "Stopping MLflow UI (PID $PID)..."
+        kill "$PID"
+        rm -f "$MLFLOW_PID_FILE"
+        success "MLflow UI stopped."
+    else
+        PID=$(lsof -ti tcp:"$MLFLOW_PORT" 2>/dev/null | head -1 || true)
+        if [ -n "$PID" ]; then
+            info "Stopping process on port $MLFLOW_PORT (PID $PID)..."
+            kill "$PID"
+            rm -f "$MLFLOW_PID_FILE"
+            success "Stopped."
+        else
+            warn "No MLflow UI process found on port $MLFLOW_PORT."
+        fi
+    fi
+}
+
 # ── Entrypoint ────────────────────────────────────────────────
 MODE="${1:-}"
 ACTION="${2:-}"
@@ -173,6 +238,13 @@ case "$MODE" in
         case "$ACTION" in
             start) local_start ;;
             stop)  local_stop  ;;
+            *)     usage ;;
+        esac
+        ;;
+    mlflow)
+        case "$ACTION" in
+            start) mlflow_start ;;
+            stop)  mlflow_stop  ;;
             *)     usage ;;
         esac
         ;;
