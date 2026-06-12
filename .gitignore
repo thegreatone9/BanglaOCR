@@ -7,6 +7,9 @@ models/
 # MLflow local run tracking folder (stale file-based store)
 mlruns/
 
+# MLflow artifacts and database
+artifacts/
+
 # Python
 __pycache__/
 *.pyc
