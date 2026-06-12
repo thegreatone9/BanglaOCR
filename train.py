@@ -123,7 +123,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--data-dir",
         type=str,
-        default="./data/BanglaLekha-Isolated",
+        default="./data/BanglaLekha-Isolated/Images",
         help="Path to the BanglaLekha-Isolated image directory.",
     )
     parser.add_argument(
